@@ -166,7 +166,7 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
   }
 };
 
-const getLevelFromPoints = (points: number): UserLevel => {
+export const getLevelFromPoints = (points: number): UserLevel => {
   if (points >= 10000) return 'TREE';
   if (points >= 3000) return 'FLOWER';
   if (points >= 500) return 'SPROUT';

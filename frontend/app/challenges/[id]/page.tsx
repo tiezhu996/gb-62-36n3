@@ -28,6 +28,8 @@ export default function ChallengeDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [awardingId, setAwardingId] = useState<string | null>(null);
+  const [awardResult, setAwardResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const { user } = useAuth();
   const router = useRouter();
 
@@ -97,6 +99,30 @@ export default function ChallengeDetailPage() {
     }
   };
 
+  const handleAward = async (submissionId: string) => {
+    if (!challenge || awardingId) return;
+
+    setAwardingId(submissionId);
+    setAwardResult(null);
+    try {
+      const res = await challengeApi.award(challenge.id, submissionId);
+      setAwardResult({
+        type: 'success',
+        text: `评奖成功，已为作者结算 +${res.data.awardedPoints} 积分`
+      });
+      await loadChallenge();
+    } catch (error: any) {
+      // 明确展示冲突原因（重复结算、活动未结束等），并以服务端状态为准刷新
+      setAwardResult({
+        type: 'error',
+        text: error.response?.data?.error || '评奖失败，请重试'
+      });
+      await loadChallenge();
+    } finally {
+      setAwardingId(null);
+    }
+  };
+
   if (loading || !challenge) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -107,6 +133,7 @@ export default function ChallengeDetailPage() {
 
   const now = new Date();
   const isActive = now >= new Date(challenge.startDate) && now <= new Date(challenge.endDate);
+  const isEnded = now > new Date(challenge.endDate);
 
   return (
     <div className="max-w-2xl mx-auto p-4">
@@ -159,6 +186,22 @@ export default function ChallengeDetailPage() {
           </button>
         )}
       </div>
+
+      {awardResult && (
+        <div className={`mt-4 p-3 rounded-lg text-sm flex items-center justify-between ${
+          awardResult.type === 'success'
+            ? 'bg-green-50 text-green-700 border border-green-200'
+            : 'bg-red-50 text-red-600 border border-red-200'
+        }`}>
+          <span>{awardResult.text}</span>
+          <button
+            onClick={() => setAwardResult(null)}
+            className="p-1 hover:bg-white hover:bg-opacity-50 rounded"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {showSubmit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -271,8 +314,18 @@ export default function ChallengeDetailPage() {
                   </div>
                   {submission.isWinning && (
                     <span className="px-2 py-0.5 bg-yellow-100 text-yellow-600 text-xs rounded-full flex items-center">
-                      <Trophy className="w-3 h-3 mr-1" /> 获奖
+                      <Trophy className="w-3 h-3 mr-1" /> 获奖 +50 积分
                     </span>
+                  )}
+                  {user?.isAdmin && isEnded && !submission.isWinning && (
+                    <button
+                      onClick={() => handleAward(submission.id)}
+                      disabled={awardingId !== null}
+                      className="ml-auto px-3 py-1 text-xs bg-yellow-500 text-white rounded-full hover:bg-yellow-600 disabled:opacity-50 flex items-center shrink-0"
+                    >
+                      <Trophy className="w-3 h-3 mr-1" />
+                      {awardingId === submission.id ? '结算中...' : '设为获奖'}
+                    </button>
                   )}
                 </div>
                 {submission.content && (
