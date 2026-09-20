@@ -115,6 +115,6 @@ export interface ChallengeSubmission {
   content: string;
   images: string[];
   isWinning: boolean;
-  user: Pick<User, 'id' | 'username' | 'avatar' | 'level'>;
+  user: Pick<User, 'id' | 'username' | 'avatar' | 'level' | 'points'>;
   createdAt: string;
 }

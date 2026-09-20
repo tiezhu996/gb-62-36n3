@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { 
-  createChallenge, 
-  getChallenges, 
+import {
+  createChallenge,
+  getChallenges,
   getChallengeById,
-  submitChallenge
+  submitChallenge,
+  awardWinner
 } from '../controllers/challengeController';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 
@@ -13,5 +14,7 @@ router.post('/', authMiddleware, adminMiddleware, createChallenge);
 router.get('/', getChallenges);
 router.get('/:id', getChallengeById);
 router.post('/:challengeId/submit', authMiddleware, submitChallenge);
+// 管理员评选获奖作品并结算 50 积分（仅活动结束后可用）
+router.post('/:challengeId/submissions/:submissionId/award', authMiddleware, adminMiddleware, awardWinner);
 
 export default router;

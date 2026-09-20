@@ -28,6 +28,9 @@ export default function ChallengeDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  // 正在结算的作品 ID，以及评奖失败时的明确冲突提示
+  const [awardingId, setAwardingId] = useState<string | null>(null);
+  const [awardError, setAwardError] = useState<string | null>(null);
   const { user } = useAuth();
   const router = useRouter();
 
@@ -97,6 +100,29 @@ export default function ChallengeDetailPage() {
     }
   };
 
+  // 管理员点选获奖：成功后刷新详情页，使获奖作品、积分和冲突状态保持一致
+  const handleAward = async (submissionId: string) => {
+    if (!challenge) return;
+    if (!window.confirm('确定将该作品评选为获奖作品？作者将获得 50 积分，且不可重复评选。')) {
+      return;
+    }
+
+    setAwardError(null);
+    setAwardingId(submissionId);
+    try {
+      await challengeApi.award(challenge.id, submissionId);
+      await loadChallenge();
+      alert('获奖结算成功，作者积分 +50');
+    } catch (error: any) {
+      // 409 为重复/并发冲突，400 为未结束或跨活动，均给出明确提示
+      const msg = error.response?.data?.error || '评奖失败';
+      setAwardError(msg);
+      await loadChallenge();
+    } finally {
+      setAwardingId(null);
+    }
+  };
+
   if (loading || !challenge) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -107,6 +133,8 @@ export default function ChallengeDetailPage() {
 
   const now = new Date();
   const isActive = now >= new Date(challenge.startDate) && now <= new Date(challenge.endDate);
+  const isEnded = now > new Date(challenge.endDate);
+  const winningSubmissions = challenge.submissions?.filter(s => s.isWinning) || [];
 
   return (
     <div className="max-w-2xl mx-auto p-4">
@@ -235,6 +263,35 @@ export default function ChallengeDetailPage() {
         </div>
       )}
 
+      {awardError && (
+        <div className="mt-3 mb-1 px-4 py-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm flex items-center justify-between">
+          <span>⚠️ {awardError}</span>
+          <button
+            onClick={() => setAwardError(null)}
+            className="text-red-400 hover:text-red-600 ml-3"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {isEnded && winningSubmissions.length > 0 && (
+        <div className="card p-4 mt-4 border-yellow-200 bg-yellow-50">
+          <h3 className="font-bold text-yellow-700 mb-2 flex items-center">
+            <Trophy className="w-5 h-5 mr-2" />
+            获奖作品（{winningSubmissions.length}）· 每件奖励结算积分 50
+          </h3>
+          <div className="space-y-1">
+            {winningSubmissions.map(s => (
+              <div key={s.id} className="flex items-center justify-between text-sm text-yellow-800">
+                <span>🏆 {s.user.username}</span>
+                <span className="font-medium">+50 积分（当前 {s.user.points ?? '-'}）</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {challenge.submissions && challenge.submissions.length > 0 && (
         <div className="card p-6 mt-4">
           <h3 className="font-bold text-gray-800 mb-4">
@@ -269,11 +326,20 @@ export default function ChallengeDetailPage() {
                       {formatTime(submission.createdAt)}
                     </span>
                   </div>
-                  {submission.isWinning && (
-                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-600 text-xs rounded-full flex items-center">
-                      <Trophy className="w-3 h-3 mr-1" /> 获奖
+                  {submission.isWinning ? (
+                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full flex items-center">
+                      <Trophy className="w-3 h-3 mr-1" /> 获奖 · +50 积分
                     </span>
-                  )}
+                  ) : user?.isAdmin && isEnded ? (
+                    <button
+                      onClick={() => handleAward(submission.id)}
+                      disabled={awardingId === submission.id}
+                      className="ml-auto px-3 py-1 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-white text-xs rounded-full flex items-center"
+                    >
+                      <Trophy className="w-3 h-3 mr-1" />
+                      {awardingId === submission.id ? '结算中...' : '设为获奖'}
+                    </button>
+                  ) : null}
                 </div>
                 {submission.content && (
                   <p className="text-gray-600 text-sm mb-2">{submission.content}</p>

@@ -110,8 +110,11 @@ export const challengeApi = {
   getById: (id: string) => api.get(`/challenges/${id}`),
   create: (data: { title: string; description: string; coverImage?: string; startDate: string; endDate: string }) => 
     api.post('/challenges', data),
-  submit: (challengeId: string, data: { content: string; images?: string[] }) => 
+  submit: (challengeId: string, data: { content: string; images?: string[] }) =>
     api.post(`/challenges/${challengeId}/submit`, data),
+  // 管理员评选获奖作品并结算积分（活动结束后）
+  award: (challengeId: string, submissionId: string) =>
+    api.post(`/challenges/${challengeId}/submissions/${submissionId}/award`),
 };
 
 export const reportApi = {
